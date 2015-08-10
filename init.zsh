@@ -32,6 +32,7 @@ function pmodload {
 
   # Add functions to $fpath.
   fpath=(${pmodules:+${ZDOTDIR:-$HOME}/.zprezto/modules/${^pmodules}/functions(/FN)} $fpath)
+  fpath=(${ZDOTDIRLOCAL}/modules/${^pmodules}/functions(/FN) $fpath)
 
   function {
     local pfunction
@@ -40,22 +41,33 @@ function pmodload {
     setopt LOCAL_OPTIONS EXTENDED_GLOB
 
     # Load Prezto functions.
-    for pfunction in ${ZDOTDIR:-$HOME}/.zprezto/modules/${^pmodules}/functions/$~pfunction_glob; do
+    for pfunction in\
+      ${ZDOTDIR:-$HOME}/.zprezto/modules/${^pmodules}/functions/$~pfunction_glob \
+      ${ZDOTDIR:-$HOME}.local/modules/${^pmodules}/functions/^([_.]*|README*)(.N:t)
+    do
       autoload -Uz "$pfunction"
     done
   }
 
   # Load Prezto modules.
   for pmodule in "$pmodules[@]"; do
-    if zstyle -t ":prezto:module:$pmodule" loaded 'yes' 'no'; then
+    if zstyle -t ":prezto:module:local:$pmodule" loaded 'yes' 'no'; then
       continue
-    elif [[ ! -d "${ZDOTDIR:-$HOME}/.zprezto/modules/$pmodule" ]]; then
-      print "$0: no such module: $pmodule" >&2
+    elif zstyle -t ":prezto:module:$pmodule" loaded 'yes' 'no'; then
       continue
-    else
-      if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/modules/$pmodule/init.zsh" ]]; then
-        source "${ZDOTDIR:-$HOME}/.zprezto/modules/$pmodule/init.zsh"
+    elif [[ ! -d "${ZDOTDIRLOCAL}/modules/$pmodule" ]]; then
+      zstyle ":prezto:module:local:${pmodule}" loaded 'no'
+
+      
+      if [[ ! -d "${ZDOTDIR:-$HOME}/.zprezto/modules/$pmodule" ]]; then
+        print "$0: no such module: $pmodule" >&2
+        continue
+      else
+        if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/modules/$pmodule/init.zsh" ]]; then
+          source "${ZDOTDIR:-$HOME}/.zprezto/modules/$pmodule/init.zsh"
+        fi
       fi
+
 
       if (( $? == 0 )); then
         zstyle ":prezto:module:$pmodule" loaded 'yes'
@@ -78,6 +90,31 @@ function pmodload {
 
         zstyle ":prezto:module:$pmodule" loaded 'no'
       fi
+    elif [[ -s "${ZDOTDIRLOCAL}/modules/$pmodule/init.zsh" ]]; then
+      # try to source a local modules
+      zstyle ":prezto:module:$pmodule" loaded 'no'
+      source "${ZDOTDIRLOCAL}/modules/$pmodule/init.zsh"
+      if (( $? == 0 )); then
+        zstyle ":prezto:module:local:$pmodule" loaded 'yes'
+        if zstyle -t ":prezto:module:$pmodule" aliases; then
+          if [[ -s "${ZDOTDIRLOCAL}/modules/${^pmodules}/aliases.zsh" ]]; then
+            source "${ZDOTDIRLOCAL}/modules/$pmodule/aliases.zsh"
+          fi
+        fi
+      else
+        zstyle ":prezto:module:local:$pmodule" loaded 'no'
+        for dzfunction in \
+          $ZDOTDIRLOCAL/modules/${^pmodule}/functions/^([_.]*|README*)(.N:t)
+        do
+          if (( $+functions[$pfunction] )); then
+            unfunction "$pfunction"
+          fi
+        done
+        # remove the fpath entry
+        fpath[(r)${ZDOTDIRLOCAL}/modules/${pmodule}/functions]=()
+      fi
+    else
+      zstyle ":prezto:module:local:${pmodule}" loaded 'no'
     fi
   done
 }

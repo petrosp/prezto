@@ -4,6 +4,7 @@
 # Authors:
 #   Sorin Ionescu <sorin.ionescu@gmail.com>
 #
+export ZDOTDIRLOCAL=$HOME/.zsh.local
 
 # Source Prezto.
 if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/init.zsh" ]]; then
